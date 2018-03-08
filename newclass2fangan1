@@ -1,0 +1,237 @@
+import os
+import re
+import sympy
+import shutil
+import math
+import numpy
+
+
+class Atom(object):
+    def __init__(self, name, number, type, position, Aclose, Bclose, Cclose, Dclose):
+        self.name = name
+        self.number = number
+        self.type = type
+        self.position = position
+        self.Aclose = Aclose
+        self.Bclose = Bclose
+        self.Cclose = Cclose
+        self.Dclose = Dclose
+
+
+
+
+txt = open('Co_1_560663.vasp', 'r')
+
+content = txt.read()
+for i in range(10):
+    content = re.sub('  ', ' ', content)
+    content = re.sub('\n ', '\n', content)
+matchp = re.match(r'(.*)\n(.*)\n(.*)\n(.*)\n(.*)', content)
+cryname = matchp.group(1)
+magnification = float(matchp.group(2))
+xLat = matchp.group(3)
+x1 = float(re.split(' ', xLat)[0])
+x2 = float(re.split(' ', xLat)[1])
+x3 = float(re.split(' ', xLat)[2])
+yLat = matchp.group(4)
+y1 = float(re.split(' ', yLat)[0])
+y2 = float(re.split(' ', yLat)[1])
+y3 = float(re.split(' ', yLat)[2])
+zLat = matchp.group(5)
+z1 = float(re.split(' ', zLat)[0])
+z2 = float(re.split(' ', zLat)[1])
+z3 = float(re.split(' ', zLat)[2])
+txt.close()
+txt = open('Co_1_560663.vasp', 'r')
+# 读取原子位置
+line = []
+for i in range(8):
+    txt.readline()
+while 1:
+    posLine = txt.readline()
+    for i in range(10):
+        posLine = re.sub('  ', ' ', posLine)
+        posLine = re.sub('\n', '', posLine)
+        posLine = posLine.lstrip()
+    if not posLine:
+        break
+    line.append(re.split(' ', posLine))
+txt.close()
+# 输出原子种类
+txt = open('Co_1_560663.vasp', 'r')
+for i in range(5):
+    txt.readline()
+typenumber = []
+for j1 in range(2):
+    posLine = txt.readline()
+    for j2 in range(10):
+        posLine = re.sub('  ', ' ', posLine)
+        posLine = posLine.lstrip()
+        posLine = re.sub('\n', '', posLine)
+    typenumber.append(re.split(' ', posLine))
+xuhao2 = 0
+for i in range(len(typenumber[0])):
+    for j1 in range(int(typenumber[1][i])):
+        line[xuhao2].append(typenumber[0][i])
+        xuhao2 = xuhao2 + 1
+# 输出位置信息
+KuoDaBeiShu = 27
+pos = []
+for i in range(len(line) * KuoDaBeiShu):
+    pos.append([])
+    # duplicate position sites
+    for j in range(3):
+        i1 = i
+        if i >= len(line):
+            i1 = i % len(line)
+        pos[i].append(float(line[i1][j]))
+    pos[i].append(line[i1][3])
+    # 向三个方向扩展
+txt.close()
+iii = 0
+for i in [0, 1, -1]:
+    for o in [0, 1, -1]:
+        for p in [0, 1, -1]:
+            for oo in range(len(line)):
+                pos[len(line) * iii + oo][0] = pos[len(line) * iii + oo][0] + i
+                pos[len(line) * iii + oo][1] = pos[len(line) * iii + oo][1] + o
+                pos[len(line) * iii + oo][2] = pos[len(line) * iii + oo][2] + p
+            iii = 1 + iii
+posreal = []
+for i in range(len(pos)):  #
+    xreal = pos[i][0] * x1 / magnification + pos[i][1] * y1 / magnification + pos[i][2] * z1 / magnification
+    yreal = pos[i][0] * x2 / magnification + pos[i][1] * y2 / magnification + pos[i][2] * z2 / magnification
+    zreal = pos[i][0] * x3 / magnification + pos[i][1] * y3 / magnification + pos[i][2] * z3 / magnification
+    posreal.append([xreal, yreal, zreal])
+    pos[i].append([xreal, yreal, zreal])
+    pos[i].append(i)
+
+position = posreal
+# 算最近原子距离
+alldistance = []
+allclose = []
+for i in range(len(pos)):
+    alldistance.append([])
+    allclose.append([])
+    for j in range(len(pos) - 1):
+        alldistance[i].append([])
+        alldistance[i][j].append(((pos[i][4][0] - pos[j][4][0]) ** 2 + (pos[i][4][1] - pos[j][4][1]) ** 2 + (
+                pos[i][4][2] - pos[j][4][2]) ** 2) ** 0.5)
+        allclose[i].append(alldistance[i][j][0])
+        alldistance[i][j].append(j)
+    alldistance[i].sort()
+    allclose[i].sort()
+    alldistance[i].pop(0)
+
+# 误差定位0.015
+errortole = 0.035
+# 消除微扰，统计临近原子个数
+for i in range(len(alldistance)):
+    for j1 in range(len(alldistance[i]) - 1):
+        if alldistance[i][j1 + 1][0] - alldistance[i][j1][0] < errortole:
+            alldistance[i][j1 + 1][0] = alldistance[i][j1][0]
+        if allclose[i][j1 + 1] - allclose[i][j1] < errortole:
+            allclose[i][j1 + 1] = allclose[i][j1]
+        if j1 > 25:
+            break
+for i in range(len(line)):
+    for j1 in range(len(alldistance[i]) - 1):
+        if alldistance[i][j1][0] != alldistance[i][j1 + 1][0]:
+            line[i].append(alldistance[i][j1][0])
+        if len(line[i]) > 10:
+            break
+# line只包含初始poscar原子，line[i]表示第No.i个原子,line[i][0,1,2]为初始poscar的x，y，z。line[i][3]为原子类型。line[i][4]为最近原子距离
+# pos包含扩展后的所有原子，pos[i][0,1,2]为初始poscar的x，y，z。
+# pos[i][3]为原子类型。pos[i][4]为原子就算坐标系。pos[i][5]为原子编号，与line[i]中的i对应。
+# alldistance包含扩展后的所有原子，alldistance[i]中的i为原子编号。
+# alldistance[i][j][0]表示离i原子第j进的原子距离，alldistance[i][j][1]表示离i原子第j进的原子编号。
+# allclose[i]包含所有原子到i原子的距离
+
+# 选取点，并确定其编号，既近邻原子数最多的点
+IDnumber = []
+for i in range(len(line)):
+    IDnumber.append(allclose[i].count(alldistance[i][0][0]))
+
+mostnumber = 0
+for i in range(len(IDnumber) - 1):
+    if IDnumber[mostnumber] < IDnumber[i + 1]:
+        mostnumber = i + 1
+
+# 获得离基点最近的原子的编号
+closenumber = []
+for i in range(IDnumber[mostnumber]):
+    closenumber.append(alldistance[mostnumber][i][1])
+
+
+# determine whether all close points and origin are on a plane
+# pos[atomnumber][4]为原子真实坐标列表[X,Y,Z]
+def determineplane(posmatrix):
+    vectors = len(posmatrix)
+    vector1 = [posmatrix[1][0] - posmatrix[0][0], posmatrix[1][1] - posmatrix[0][1],
+                   posmatrix[1][2] - posmatrix[0][2]]
+    vector2 = [posmatrix[2][0] - posmatrix[0][0], posmatrix[2][1] - posmatrix[0][1],
+                   posmatrix[2][2] - posmatrix[0][2]]
+    a = sympy.Symbol('a')
+    b = sympy.Symbol('b')
+    for i in range(len(posmatrix)-3):
+        vector3 = [posmatrix[i+3][0] - posmatrix[0][0], posmatrix[i+3][1] - posmatrix[0][1],
+                   posmatrix[i+3][2] - posmatrix[0][2]]
+        prependicular = sympy.solve(
+        [a * vector1[0] + b * vector2[0] - vector3[0], a * vector1[1] + b * vector2[1] - vector3[1],
+             a * vector1[2] + b * vector2[2] - vector3[2]],
+        [a, b])
+        if prependicular==[]:
+            return 0
+    return 1
+
+
+
+pointsetarea = [pos[mostnumber][4]]
+for i in closenumber:
+    pointsetarea.append(pos[i][4])
+# 判断在不在一个面上，并给予第二个编号，如果在为1，不在为0
+if determineplane(pointsetarea) == 0:
+    IDnumber2 = 0
+else:
+    IDnumber2 = 1
+if pos[mostnumber][3] == pos[closenumber[0]][3]:
+    IDnumber3 = 1
+else:
+    IDnumber3 = 0
+
+# 对次近邻原子进行编号,先判断有几个次近邻原子
+
+secclosenumber = []
+secdistance=alldistance[mostnumber][len(closenumber)][0]
+for i in range(20):
+    if abs(alldistance[mostnumber][i][0]-secdistance)<0.005:
+        secclosenumber.append(alldistance[mostnumber][i][1])
+if pos[mostnumber][3]==pos[secclosenumber[0]][3]:
+    print(IDnumber[mostnumber], IDnumber2, IDnumber3)
+else:
+    pointsetarea = [pos[mostnumber][4]]
+    for i in range(len(secclosenumber)):
+        pointsetarea.append(pos[secclosenumber[i][4]])
+    if determineplane(pointsetarea)==0:
+        IDnumber5=0
+    else :
+        IDnumber5=1
+    if pos[secclosenumber[0]][3] == pos[closenumber[0]][3]:
+        IDnumber6 = 1
+    else:
+        IDnumber6 = 0
+    print(IDnumber[mostnumber], IDnumber2, IDnumber3,len(secclosenumber),IDnumber5,IDnumber6)
+# line只包含初始poscar原子，line[i]表示第No.i个原子,line[i][0,1,2]为初始poscar的x，y，z。line[i][3]为原子类型。line[i][4]为最近原子距离
+# pos包含扩展后的所有原子，pos[i][0,1,2]为初始poscar的x，y，z。
+# pos[i][3]为原子类型。pos[i][4]为原子就算坐标系。pos[i][5]为原子编号，与line[i]中的i对应。
+# alldistance包含扩展后的所有原子，alldistance[i]中的i为原子编号。
+# alldistance[i][j][0]表示离i原子第j进的原子距离，alldistance[i][j][1]表示离i原子第j进的原子编号。
+# allclose[i]包含所有原子到i原子的距离
+
+
+
+
+
+
+
+

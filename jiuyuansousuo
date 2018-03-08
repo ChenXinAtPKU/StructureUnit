@@ -1,0 +1,74 @@
+import os
+import re
+import sympy
+import shutil
+import math
+
+
+#晶胞系数需要换回去
+
+txt = open('As_1_641.vasp', 'r')
+# 读取原子位置
+line = []
+for i in range(8):
+    txt.readline()
+while 1:
+    posLine = txt.readline()
+    for i in range(10):
+        posLine = re.sub('  ', ' ', posLine)
+        posLine = re.sub('\n', '', posLine)
+        posLine=posLine.lstrip()
+    if not posLine:
+        break
+    line.append(re.split(' ', posLine))
+txt.close()
+    #输出原子种类
+txt = open('As_1_641.vasp', 'r')
+for i in range(5):
+    txt.readline()
+typenumber = []
+for j1 in range(2):
+    posLine = txt.readline()
+    for j2 in range(10):
+        posLine = re.sub('  ', ' ', posLine)
+        posLine = posLine.lstrip()
+        posLine = re.sub('\n', '', posLine)
+    typenumber.append(re.split(' ', posLine))
+xuhao2 = 0
+for i in range(len(typenumber[0])):
+    for j1 in range(int(typenumber[1][i])):
+        line[xuhao2].append(typenumber[0][i])
+        xuhao2 = xuhao2 + 1
+# 输出位置信息
+KuoDaBeiShu = 27
+pos = []
+for i in range(len(line) * KuoDaBeiShu):
+    pos.append([])
+        # duplicate position sites
+    for j in range(3):
+        i1 = i
+        if i >= len(line):
+            i1 = i % len(line)
+        pos[i].append(float(line[i1][j]))
+    pos[i].append(line[i1][3])
+    # 向三个方向扩展
+
+iii = 0
+for i in [0, 1, -1]:
+    for o in [0, 1, -1]:
+        for p in [0, 1, -1]:
+            for oo in range(len(line)):
+                pos[len(line) * iii + oo][0] = pos[len(line) * iii + oo][0] + i
+                pos[len(line) * iii + oo][1] = pos[len(line) * iii + oo][1] + o
+                pos[len(line) * iii + oo][2] = pos[len(line) * iii + oo][2] + p
+            iii = 1 + iii
+
+#算最近邻原子个数与编号
+alldistance=[]
+for i in range(len(line)):
+    alldistance.append([])
+    for j in range(len(pos)-1):
+        alldistance[i].append(((pos[i][0]-pos[j][0])**2+(pos[i][1]-pos[j][1])**2+(pos[i][2]-pos[j][2])**2)**0.5)
+    alldistance[i].sort()
+    alldistance[i].pop(0)
+
